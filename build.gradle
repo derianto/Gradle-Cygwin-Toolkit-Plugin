@@ -125,4 +125,12 @@ task testToolkit << {
   // Note: input must be an absolute UNIX-style path by convention
 
   testCrossEnvPath("/cygdrive/c/Program Files/a")
+
+  println("============================================================================")
+  println("  Some real tests")
+  println("============================================================================")
+
+  println("Original filename = $rootDir/build.gradle")
+  println("Converted filename = ${crossEnvPath("$rootDir/build.gradle")}")
+  println("This file length is ${file(crossEnvPath("$rootDir/build.gradle")).getText().length()}")
 }
