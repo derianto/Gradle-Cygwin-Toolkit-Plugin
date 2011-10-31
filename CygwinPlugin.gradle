@@ -1,0 +1,159 @@
+apply plugin: CygwinPlugin
+
+// Types of environments
+// ---------------------
+// 1. UNIX
+// 2. Win but not Cygwin
+// 3. Win and Cygwin.  cygpath command is assumed to be present.
+//
+// NOTE: Currently only environments no. 1 and 3 are supported
+//
+//
+// Types of paths
+// --------------
+//          Relative  Absolute         Shell compatible        Gradle file method / Jetty / Tomcat
+//
+// UNIX:    a/b       /a/b             a/b or /a/b             a/b or /a/b
+//
+// Win:     a\b       C:\a\b           C:\a\b                  file:///c:/a/b.txt
+//
+// Cygwin:  a/b       /cygdrive/c/a/b  a/b or /cygdrive/c/a/b  -
+//                                     or a\b or C:\a\b
+//
+// Use conventions
+// ---------------
+// The build script should maintain all hard-coded values in UNIX format,
+// and conversion to Win / Cygwin formats are done as late as possible as necessary.
+//
+
+// Repair separators in the path into all '/' for UNIX or all '\\' for Win
+class CygwinPlugin implements Plugin<Project> {
+  def void apply(Project project) {
+    project.convention.plugins.utilities = new CygwinUtil(project)
+  }
+}
+
+class CygwinUtil
+{
+  private Project _project
+  public Map<String, String> _env
+  // Mutable for testing purpose
+  public boolean _isWin
+  public boolean _isCygwin
+
+  CygwinUtil(Project project)
+  {
+    _project = project
+    _env = System.getenv()
+    _isWin = _env['OS'].toLowerCase().startsWith('win')
+    _isCygwin = _isWin && _env['CYGWIN'] != null
+  }
+
+  def winOrUnixSeparator(String path)
+  {
+    if (_isWin)
+      return winSeparator(path)
+    else
+      return unixSeparator(path)
+  }
+
+  def withWinSeparator(String path)
+  {
+    return path.replaceAll("/", "\\\\") // Note: these are regexes
+  }
+
+  def withUnixSeparator(String path)
+  {
+    return path.replaceAll("\\\\", "/")
+  }
+
+  // Either return the Windows-formatted or UNIX (unmodified) path.
+  //
+  // Note: requires Cygwin's cygpath
+  def winOrUnixPath(String path)
+  {
+    if (_isCygwin)
+      return winPath(path)
+    else
+      return path // Assuming path is already UNIX-style
+  }
+
+  // Either return the Cygwin-formatted (UNIX-like) or UNIX path.
+  def cygwinOrUnixPath(String path)
+  {
+    if (_isCygwin)
+      return unixPath(path)
+    else
+      return path // Assuming path is already UNIX-style
+  }
+
+  // Heuristically detect if this is a Windows-style path
+  def isWinPath(String path)
+  {
+    return path.contains("\\") || (path.length() >= 2 && path.chatAt(1) == ':')
+  }
+
+  // Note: requires Cygwin's cygpath
+  def winPath(String path)
+  {
+    new ByteArrayOutputStream().withStream { os ->
+      _project.exec {
+        executable = 'cygpath'
+        args = ['-w', path]
+        standardOutput = os
+      }
+      def outputString = os.toString().trim()
+      return outputString
+    }
+  }
+
+  // Note: requires Cygwin's cygpath
+  def unixPath(String path)
+  {
+    new ByteArrayOutputStream().withStream { os ->
+      _project.exec {
+        executable = 'cygpath'
+        args = ['-u', path]
+        standardOutput = os
+      }
+      def outputString = os.toString().trim()
+      return outputString
+    }
+  }
+
+  // Return a file(path) compatible with Win, Cygwin, or UNIX paths.
+  // On UNIX, path is unmodified.
+  // On Cygwin, path is converted into file:///C:/_____ format
+  // The input must be an absolute path.
+  def crossEnvPath(String path)
+  {
+    if (_isCygwin) {
+      // e.g. file:///c:/a/b
+      def unixWinPath = withUnixSeparator(winPath(path))
+      return "file:///$unixWinPath"
+    }
+    else // UNIX
+      return path // Assuming path is already UNIX-style
+  }
+
+  // Execute a command with the specified argument list in the specified working directory,
+  // and print the outputs to the standard output
+  def execSync(dir, command, arguments)
+  {
+    print("From $dir executing $command")
+    for (String s: arguments)
+    {
+      print(" $s")
+    }
+    new ByteArrayOutputStream().withStream { os ->
+      println()
+      _project.exec {
+        workingDir = dir
+        executable = command
+        args = arguments
+        setErrorOutput(System.out)
+        setStandardOutput(System.out)
+      }
+    }
+  }
+}

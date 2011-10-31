@@ -1,0 +1,128 @@
+buildscript {
+  repositories {
+    mavenCentral()
+  }
+}
+
+apply from: 'CygwinPlugin.gradle'
+
+defaultTasks 'testToolkit'
+
+cygwinOrUnixRootDir = cygwinOrUnixPath(rootDir.absolutePath)
+println("Current environment isWin = $_isWin, isCygwin = $_isCygwin")
+println("cygwinOrUnixRootDir = $cygwinOrUnixRootDir")
+
+def testSeparator(String s)
+{
+  println("s                       = $s")
+  println("withWinSeparator(s)     = ${withWinSeparator(s)}")
+  println("withUnixSeparator(s)    = ${withUnixSeparator(s)}")
+  println()
+}
+
+def testWinPathUnixPath(String s)
+{
+  println("s                         = $s")
+  println("unixPath(s) (cygwin only) = ${unixPath(s)}")
+  println("winPath(s) (cygwin only)  = ${winPath(s)}")
+  println()
+}
+
+def testWinOrCygwinOrUnixPath(String s)
+{
+  def originalIsWin = _isWin
+  def originalIsCygwin = _isCygwin
+
+  println("s                   = $s")
+
+  // Test with no windows, no cygwin
+  _isWin = false
+  _isCygwin = false
+  println("[UNDER UNIX]")
+  println("winOrUnixPath(s)    = ${winOrUnixPath(s)}")
+  println("cygwinOrUnixPath(s) = ${cygwinOrUnixPath(s)}")
+
+  // Test with windows, with cygwin
+  if (originalIsCygwin)
+  {
+    println("[UNDER CYGWIN]")
+    _isWin = true
+    _isCygwin = true
+    println("winOrUnixPath(s)    = ${winOrUnixPath(s)}")
+    println("cygwinOrUnixPath(s) = ${cygwinOrUnixPath(s)}")
+  }
+
+  println()
+
+  // Revert to original
+  _isWin = originalIsWin
+  _isCygwin = originalIsCygwin
+}
+
+def testCrossEnvPath(String s)
+{
+  def originalIsWin = _isWin
+  def originalIsCygwin = _isCygwin
+
+  println("s               = $s")
+
+  // Test with no windows, no cygwin
+  _isWin = false
+  _isCygwin = false
+  println("[UNDER UNIX]")
+  println("crossEnvPath(s) = ${crossEnvPath(s)}")
+
+  // Test with windows, with cygwin - requires cygpath
+  if (originalIsCygwin)
+  {
+    println("[UNDER CYGWIN]")
+    _isWin = true
+    _isCygwin = true
+    println("crossEnvPath(s) = ${crossEnvPath(s)}")
+  }
+
+  println()
+
+  // Revert to original
+  _isWin = originalIsWin
+  _isCygwin = originalIsCygwin
+}
+
+task testToolkit << {
+
+  println("============================================================================")
+  println("  Test separators")
+  println("============================================================================")
+
+  testSeparator("a/b\\c")
+
+  println("============================================================================")
+  println("  Test winPath() and unixPath()")
+  println("============================================================================")
+
+  testWinPathUnixPath("a/b\\c")
+  testWinPathUnixPath("/cygdrive/c/Program Files\\a")
+  testWinPathUnixPath(".")
+  testWinPathUnixPath("/a\\b/c")
+  testWinPathUnixPath("C:\\a/b\\c")
+  testWinPathUnixPath("C:\\a/Program Files\\c")
+
+  println("============================================================================")
+  println("  Test winOrUnixPath() and cygwinOrUnixPath()")
+  println("============================================================================")
+
+  // Note: input must be a UNIX-style path by convention
+  // Warning: gradle's rootDir should be converted to UNIX-style path first
+
+  testWinOrCygwinOrUnixPath("a/b/c")
+  testWinOrCygwinOrUnixPath("/cygdrive/c/Program Files/a")
+  testWinOrCygwinOrUnixPath(".")
+
+  println("============================================================================")
+  println("  Test Jetty / Tomcat / Gradle file() method compatible file path")
+  println("============================================================================")
+
+  // Note: input must be an absolute UNIX-style path by convention
+
+  testCrossEnvPath("/cygdrive/c/Program Files/a")
+}

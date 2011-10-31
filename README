@@ -1,0 +1,17 @@
+Gradle Cygwin Toolkit Plugin
+----------------------------
+Provides some utilities to determine if the the environment is a cygwin environment,
+and some methods to convert UNIX paths to Windows path, Cygwin paths, or file:///
+style path using Cygwin's cygpath tool.
+
+This toolkit is a reaction to the author's frustration with dealing with various
+path issues encountered when writing gradle scripts in cygwin environment, e.g.
+when passing a path to file() method, or when writing WAR path in a Jetty
+context file.  In fact, now crossEnvPath(path) method in this toolkit converts any
+path to a form consumable by those cases.
+
+To use, simply insert this line into your build script:
+
+  apply from: 'CygwinPlugin.gradle'
+
+The file build.gradle in the repo contains example uses.
